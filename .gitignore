@@ -1,0 +1,52 @@
+# === Vercel ===
+**/*.vercel
+
+# === Rust ===
+**/target/
+**/*.rs.bk
+
+# === Shuttle ===
+**/*.shuttle*
+Secrets*.toml
+
+# === Environment Files ===
+.env
+.env.*
+**/*.env
+
+# === Node (for Tailwind, Vite, etc.) ===
+**/node_modules
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# === Frontend build artifacts ===
+**/dist/
+**/public/build/
+**/build/
+
+# === OS / Editor / Tooling ===
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+*.bak
+*.log
+.idea/
+.vscode/
+
+# === Leptos (WebAssembly pkg folder) ===
+**/pkg/
+
+# === Trunk build artifacts ===
+**/trunk-build/
+
+# === Cargo.lock per package (optional to ignore in libraries, but kept in bins) ===
+# Uncomment if you want to ignore in libraries only
+# frontend/Cargo.lock
+# shared/Cargo.lock
+
+# === Backup or Control Files ===
+session_control.json
+
