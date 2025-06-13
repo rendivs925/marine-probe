@@ -1,57 +1,61 @@
-use actix::prelude::*;
-use actix_web::{App, HttpRequest, HttpServer, Responder, get, web};
-use actix_web_actors::ws;
+use actix_web::{App, HttpRequest, HttpResponse, HttpServer, ResponseError, get, web};
+use actix_ws::{Message, handle};
+use futures_util::StreamExt;
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS};
 use std::time::Duration;
+use thiserror::Error;
 use tokio::sync::broadcast;
 
-struct WsSession {
-    rx: broadcast::Receiver<String>,
+#[derive(Debug, Error)]
+pub enum AppError {
+    #[error("MQTT error: {0}")]
+    Mqtt(#[from] rumqttc::ClientError),
+    #[error("Web error: {0}")]
+    Web(#[from] actix_web::Error),
+    #[error("UTF-8 decode error: {0}")]
+    Utf8(#[from] std::string::FromUtf8Error),
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
 }
 
-impl Actor for WsSession {
-    type Context = ws::WebsocketContext<Self>;
-
-    fn started(&mut self, ctx: &mut Self::Context) {
-        let addr = ctx.address();
-        let mut rx = self.rx.resubscribe();
-
-        actix::spawn(async move {
-            while let Ok(msg) = rx.recv().await {
-                let _ = addr.do_send(WsMessage(msg));
-            }
-        });
+impl ResponseError for AppError {
+    fn error_response(&self) -> HttpResponse {
+        HttpResponse::InternalServerError().body(self.to_string())
     }
-}
-
-#[derive(Message)]
-#[rtype(result = "()")]
-struct WsMessage(String);
-
-impl Handler<WsMessage> for WsSession {
-    type Result = ();
-
-    fn handle(&mut self, msg: WsMessage, ctx: &mut Self::Context) {
-        ctx.text(msg.0);
-    }
-}
-
-impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
-    fn handle(&mut self, _: Result<ws::Message, ws::ProtocolError>, _: &mut Self::Context) {}
 }
 
 #[get("/ws")]
 async fn ws_handler(
     req: HttpRequest,
-    stream: web::Payload,
+    body: web::Payload,
     tx: web::Data<broadcast::Sender<String>>,
-) -> impl Responder {
-    let session = WsSession { rx: tx.subscribe() };
-    ws::start(session, &req, stream)
+) -> Result<HttpResponse, AppError> {
+    let (res, session, mut msg_stream) = handle(&req, body)?;
+    let mut rx = tx.subscribe();
+
+    let mut session_tx = session.clone();
+    actix_web::rt::spawn(async move {
+        while let Ok(msg) = rx.recv().await {
+            if let Err(e) = session_tx.text(msg).await {
+                eprintln!("❌ WebSocket send error: {:?}", e);
+                break;
+            }
+        }
+    });
+
+    actix_web::rt::spawn(async move {
+        while let Some(Ok(msg)) = msg_stream.next().await {
+            if let Message::Text(txt) = msg {
+                println!("Client said: {}", txt);
+            }
+        }
+    });
+
+    Ok(res)
 }
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Result<(), AppError> {
     let (mqtt_client, mut event_loop) = connect_mqtt();
     mqtt_client
         .subscribe("probe/data", QoS::AtLeastOnce)

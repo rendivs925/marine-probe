@@ -1,6 +1,6 @@
 use chrono::Utc;
 use rand::{Rng, rng};
-use rumqttc::{AsyncClient, MqttOptions, QoS};
+use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS};
 use std::time::Duration;
 use tokio::{task, time};
 
@@ -11,34 +11,37 @@ async fn main() {
 
     let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
 
-    task::spawn(async move {
-        loop {
-            if let Err(e) = eventloop.poll().await {
-                eprintln!("MQTT error: {:?}", e);
+    loop {
+        if let Ok(event) = eventloop.poll().await {
+            if let Event::Incoming(Packet::ConnAck(_)) = event {
+                println!("✅ MQTT connected");
+                break;
             }
+        }
+    }
+
+    task::spawn(async move {
+        while let Ok(event) = eventloop.poll().await {
+            println!("🔄 Event: {:?}", event);
         }
     });
 
     let mut rng = rng();
 
     loop {
-        let temperature: f64 = rng.random_range(20.0..30.0);
-        let salinity: f64 = rng.random_range(30.0..35.0);
-        let turbidity: f64 = rng.random_range(5.0..15.0);
-
         let payload = format!(
             r#"{{"timestamp":"{}","temperature":{:.2},"salinity":{:.2},"turbidity":{:.2}}}"#,
             Utc::now().to_rfc3339(),
-            temperature,
-            salinity,
-            turbidity
+            rng.random_range(20.0..30.0),
+            rng.random_range(30.0..35.0),
+            rng.random_range(5.0..15.0)
         );
 
         if let Err(e) = client
             .publish("probe/data", QoS::AtLeastOnce, false, payload)
             .await
         {
-            eprintln!("Publish failed: {:?}", e);
+            eprintln!("❌ Publish failed: {:?}", e);
         }
 
         time::sleep(Duration::from_secs(2)).await;
