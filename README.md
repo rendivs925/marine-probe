@@ -110,7 +110,54 @@ Simulates a physical marine sensor by publishing MQTT messages every 2 seconds.
 
 ## 🧪 Testing Setup
 
-1.  **Run MQTT broker locally** (e.g., Mosquitto)
+To set up and test the system, follow these steps:
+
+1.  **Run MQTT broker locally** (e.g., Mosquitto):
+
+    Before proceeding, ensure you have Mosquitto installed. If you don't, here's how to install it on common Linux distributions:
+
+    - **Ubuntu/Debian:**
+
+      ```bash
+      sudo apt update
+      sudo apt install mosquitto mosquitto-clients
+      ```
+
+      Then, start the service:
+
+      ```bash
+      sudo systemctl start mosquitto.service
+      sudo systemctl enable mosquitto.service # (optional) to start on boot
+      ```
+
+    - **Arch Linux:**
+
+      ```bash
+      sudo pacman -S mosquitto
+      ```
+
+      Then, start the service:
+
+      ```bash
+      sudo systemctl start mosquitto.service
+      sudo systemctl enable mosquitto.service # (optional) to start on boot
+      ```
+
+    - **Fedora:**
+
+      ```bash
+      sudo dnf install mosquitto
+      ```
+
+      Then, start the service:
+
+      ```bash
+      sudo systemctl start mosquitto.service
+      sudo systemctl enable mosquitto.service # (optional) to start on boot
+      ```
+
+    - **Other Distributions:** Please refer to your distribution's package manager documentation for installing Mosquitto. Once installed, the command to start the service is generally `sudo systemctl start mosquitto.service`.
+
 2.  **Start backend WebSocket bridge**:
 
     ```bash
